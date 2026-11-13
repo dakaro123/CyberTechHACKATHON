@@ -1,0 +1,16 @@
+# Render Blueprint: Dashboard → New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: wise-flow
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: FX_MODE
+        value: live
+      - key: WISE_API_TOKEN
+        sync: false
