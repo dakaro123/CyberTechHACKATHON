@@ -70,6 +70,8 @@ export interface Plan {
   salary: number;
   currency: CurrencyCode;
   savingsRate: number;
+  /** Amounts the user set for flexible jars in this draft; the other jars follow the forecast. */
+  overrides: Record<string, number>;
   categories: Category[];
   fxQuotes: FxQuote[];
   warnings: PlanWarning[];

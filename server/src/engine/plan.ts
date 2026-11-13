@@ -144,6 +144,7 @@ export function buildPlan(input: BuildPlanInput): Plan {
     salary: round2(input.salary),
     currency: input.currency,
     savingsRate,
+    overrides: { ...overrides },
     categories,
     fxQuotes: usedQuotes,
     warnings,

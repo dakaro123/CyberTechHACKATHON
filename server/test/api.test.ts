@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { Category } from '../../shared/types';
 import { createApp } from '../src/app';
 import { WiseFlowService } from '../src/service';
-import { withFallback } from '../src/wise/fx';
+import { withFallback, type FxProvider } from '../src/wise/fx';
 
 const now = () => new Date('2026-11-13T10:00:00Z');
 
@@ -89,5 +89,38 @@ describe('Wise Flow API', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('WiseFlowService', () => {
+  const offline = withFallback(null, { offline: true, now });
+  const slowFx: FxProvider = {
+    description: 'slow Wise',
+    quote: async (request) => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      return offline.quote(request);
+    },
+  };
+
+  it('does not let a slow Wise quote overwrite an approval made meanwhile', async () => {
+    const service = new WiseFlowService({ fx: slowFx, now });
+    await service.payday({ amount: 2000 });
+
+    const refresh = service.payday({ amount: 2000, savingsRate: 0.05, refreshQuotes: true });
+    const approval = service.approve();
+    await Promise.all([refresh, approval]);
+
+    const state = service.getState();
+    expect(state.phase).toBe('active');
+    expect(state.plan?.savingsRate).toBe(0.05);
+  });
+
+  it('handles a reset while a payday is waiting for Wise', async () => {
+    const service = new WiseFlowService({ fx: slowFx, now });
+    const payday = service.payday({ amount: 2000 });
+    const reset = service.reset();
+
+    await expect(payday).resolves.toMatchObject({ status: 'draft' });
+    await expect(reset).resolves.toMatchObject({ phase: 'awaiting-payday', plan: null });
   });
 });

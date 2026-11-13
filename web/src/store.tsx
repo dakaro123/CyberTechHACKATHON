@@ -60,7 +60,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [forecast, setForecast] = useState<Forecast | null>(null);
   const [merchants, setMerchants] = useState<MerchantInfo[]>([]);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState(0);
+  const busy = pending > 0;
   const [route, setRoute] = useState<Route>(readRoute);
   const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
@@ -115,7 +116,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const run = useCallback(
     async <T,>(call: () => Promise<T>, success?: (result: T) => string | undefined): Promise<T | undefined> => {
-      setBusy(true);
+      setPending((count) => count + 1);
       try {
         const result = await call();
         await reload();
@@ -126,7 +127,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         notify(error instanceof Error ? error.message : String(error), 'error');
         return undefined;
       } finally {
-        setBusy(false);
+        setPending((count) => count - 1);
       }
     },
     [notify, reload],

@@ -15,7 +15,11 @@ const service = new WiseFlowService({ fx });
 const webDist = path.join(root, 'web', 'dist');
 const app = createApp(service, { webDist });
 
-app.listen(config.port, () => {
+app.listen(config.port, (error?: Error) => {
+  if (error) {
+    console.error(`Cannot start Wise Flow on port ${config.port}: ${error.message}`);
+    process.exit(1);
+  }
   console.log(`Wise Flow API  http://localhost:${config.port}/api`);
   console.log(`FX provider    ${fx.description}`);
   if (existsSync(path.join(webDist, 'index.html'))) {

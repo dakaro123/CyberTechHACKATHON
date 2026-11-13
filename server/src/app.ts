@@ -30,8 +30,8 @@ export function createApp(service: WiseFlowService, options: AppOptions = {}) {
   api.get('/plan', (_req, res) => {
     res.json(service.getPlan());
   });
-  api.post('/plan/approve', (_req, res) => {
-    res.json(service.approve());
+  api.post('/plan/approve', async (_req, res) => {
+    res.json(await service.approve());
   });
   api.get('/categories', (_req, res) => {
     res.json(service.categories());
@@ -42,11 +42,11 @@ export function createApp(service: WiseFlowService, options: AppOptions = {}) {
   api.post('/purchases', async (req, res) => {
     res.status(201).json(await service.createPurchase(req.body));
   });
-  api.post('/purchases/:id/split', (req, res) => {
-    res.json(service.split(req.params.id, req.body));
+  api.post('/purchases/:id/split', async (req, res) => {
+    res.json(await service.split(req.params.id, req.body));
   });
-  api.post('/month-end', (_req, res) => {
-    res.json(service.monthEnd());
+  api.post('/month-end', async (_req, res) => {
+    res.json(await service.monthEnd());
   });
   api.get('/forecast', (_req, res) => {
     res.json(service.forecast());
@@ -57,8 +57,8 @@ export function createApp(service: WiseFlowService, options: AppOptions = {}) {
   api.get('/fx/quote', async (req, res) => {
     res.json(await service.quote(req.query));
   });
-  api.post('/demo/reset', (_req, res) => {
-    res.json(service.reset());
+  api.post('/demo/reset', async (_req, res) => {
+    res.json(await service.reset());
   });
   api.use((_req, res) => {
     res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Unknown API route.' } });

@@ -208,13 +208,26 @@ export function ScreenTitle({ tag, title, subtitle }: { tag?: ReactNode; title: 
   );
 }
 
-export function Chip({ selected, children, onClick, icon }: { selected?: boolean; children: ReactNode; onClick(): void; icon?: string }) {
+export function Chip({
+  selected,
+  disabled,
+  children,
+  onClick,
+  icon,
+}: {
+  selected?: boolean;
+  disabled?: boolean;
+  children: ReactNode;
+  onClick(): void;
+  icon?: string;
+}) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
       className={cx(
-        'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 font-label-bold text-label-bold transition-transform active:scale-95',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 font-label-bold text-label-bold transition-transform active:scale-95 disabled:opacity-50',
         selected ? 'bg-inverse-surface text-inverse-on-surface' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-variant',
       )}
     >

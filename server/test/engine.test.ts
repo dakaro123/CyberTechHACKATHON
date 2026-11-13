@@ -76,9 +76,11 @@ describe('buildPlan', () => {
   });
 
   it('lets the user adjust a flexible jar while Free Money absorbs the difference', () => {
-    const c = jars(makePlan(2000, { food: 250 }));
+    const plan = makePlan(2000, { food: 250 });
+    const c = jars(plan);
     expect(c.food.allocated).toBe(250);
     expect(c.free.allocated).toBe(612.66);
+    expect(plan.overrides).toEqual({ food: 250 });
   });
 
   it('funds bills first and leaves the cushion and flexible jars empty when salary is below fixed bills', () => {

@@ -143,7 +143,8 @@ function DraftPlan({ plan, state }: { plan: Plan; state: AppState }) {
       amount: plan.salary,
       currency: plan.currency,
       savingsRate: changes.savingsRate ?? plan.savingsRate,
-      overrides: { ...Object.fromEntries(adjustable.map((c) => [c.id, c.allocated])), ...changes.overrides },
+      // Only amounts the user actually set; computed (e.g. scaled-down) amounts must not become fixed.
+      overrides: { ...plan.overrides, ...changes.overrides },
       refreshQuotes: changes.refreshQuotes,
     });
 
@@ -206,7 +207,7 @@ function DraftPlan({ plan, state }: { plan: Plan; state: AppState }) {
                 {c.type === 'savings' && (
                   <div className="flex flex-wrap gap-2 pl-[52px]">
                     {SAVINGS_RATES.map((rate) => (
-                      <Chip key={rate} selected={rate === plan.savingsRate} onClick={() => void rebuild({ savingsRate: rate })}>
+                      <Chip key={rate} disabled={busy} selected={rate === plan.savingsRate} onClick={() => void rebuild({ savingsRate: rate })}>
                         {Math.round(rate * 100)}%
                       </Chip>
                     ))}

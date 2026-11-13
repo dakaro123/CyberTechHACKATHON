@@ -61,19 +61,34 @@ export class WiseFlowService {
   private readonly now: () => Date;
   private readonly seed?: number;
   private state!: State;
+  private queue: Promise<unknown> = Promise.resolve();
 
   constructor(options: ServiceOptions) {
     this.fx = options.fx;
     this.now = options.now ?? (() => new Date());
     this.seed = options.seed;
-    this.reset();
+    this.resetState();
   }
 
   get fxDescription(): string {
     return this.fx.description;
   }
 
-  reset(): AppState {
+  /**
+   * Runs state changes one at a time, in call order. Payday awaits Wise quotes; without this an
+   * approve or reset arriving during that wait would be overwritten by the stale draft.
+   */
+  private exclusive<T>(task: () => T | Promise<T>): Promise<T> {
+    const result = this.queue.then(task);
+    this.queue = result.catch(() => undefined);
+    return result;
+  }
+
+  reset(): Promise<AppState> {
+    return this.exclusive(() => this.resetState());
+  }
+
+  private resetState(): AppState {
     const month = monthKey(this.now());
     this.state = {
       phase: 'awaiting-payday',
@@ -124,7 +139,11 @@ export class WiseFlowService {
   }
 
   /** POST /payday: builds (or rebuilds) the draft plan. Nothing is committed until /plan/approve. */
-  async payday(body: unknown): Promise<Plan> {
+  payday(body: unknown): Promise<Plan> {
+    return this.exclusive(() => this.buildDraft(body));
+  }
+
+  private async buildDraft(body: unknown): Promise<Plan> {
     const { state } = this;
     if (state.phase === 'active') {
       throw conflict('MONTH_ACTIVE', 'This month is still running. Close the month before the next payday.');
@@ -188,15 +207,17 @@ export class WiseFlowService {
   }
 
   /** POST /plan/approve: the user confirms; jars are created and the month starts. */
-  approve(): Plan {
-    const { state } = this;
-    if (state.phase !== 'draft' || !state.plan) {
-      throw conflict('NO_DRAFT_PLAN', 'There is no draft plan to approve. Start with POST /payday.');
-    }
-    state.plan = { ...state.plan, status: 'active', approvedAt: this.now().toISOString() };
-    state.phase = 'active';
-    state.purchases = [];
-    return this.currentPlan();
+  approve(): Promise<Plan> {
+    return this.exclusive(() => {
+      const { state } = this;
+      if (state.phase !== 'draft' || !state.plan) {
+        throw conflict('NO_DRAFT_PLAN', 'There is no draft plan to approve. Start with POST /payday.');
+      }
+      state.plan = { ...state.plan, status: 'active', approvedAt: this.now().toISOString() };
+      state.phase = 'active';
+      state.purchases = [];
+      return this.currentPlan();
+    });
   }
 
   getPlan(): Plan {
@@ -213,7 +234,11 @@ export class WiseFlowService {
   }
 
   /** POST /purchases: a card payment; the merchant directory suggests a jar. */
-  async createPurchase(body: unknown): Promise<PurchaseResult> {
+  createPurchase(body: unknown): Promise<PurchaseResult> {
+    return this.exclusive(() => this.recordPurchase(body));
+  }
+
+  private async recordPurchase(body: unknown): Promise<PurchaseResult> {
     const plan = this.requireActivePlan();
     const request = parsePurchaseRequest(body, plan.currency);
     const suggestion = suggestCategory(request.merchant);
@@ -254,17 +279,23 @@ export class WiseFlowService {
   }
 
   /** POST /purchases/:id/split: move all or part of a purchase between flexible jars. */
-  split(id: string, body: unknown): PurchaseResult {
-    const plan = this.requireActivePlan();
-    const purchase = this.state.purchases.find((p) => p.id === id);
-    if (!purchase) throw notFound('PURCHASE_NOT_FOUND', `Purchase ${id} not found in this month.`);
-    const splits = (body as { splits?: unknown } | undefined)?.splits;
-    purchase.splits = normalizeSplits(purchase, splits, plan.categories);
-    return this.purchaseResult(id);
+  split(id: string, body: unknown): Promise<PurchaseResult> {
+    return this.exclusive(() => {
+      const plan = this.requireActivePlan();
+      const purchase = this.state.purchases.find((p) => p.id === id);
+      if (!purchase) throw notFound('PURCHASE_NOT_FOUND', `Purchase ${id} not found in this month.`);
+      const splits = (body as { splits?: unknown } | undefined)?.splits;
+      purchase.splits = normalizeSplits(purchase, splits, plan.categories);
+      return this.purchaseResult(id);
+    });
   }
 
   /** POST /month-end: leftovers of flexible jars go to the cushion; the month is archived. */
-  monthEnd(): MonthEndResult {
+  monthEnd(): Promise<MonthEndResult> {
+    return this.exclusive(() => this.closeMonth());
+  }
+
+  private closeMonth(): MonthEndResult {
     const plan = this.requireActivePlan();
     const { state } = this;
     const ledger = applyLedger(plan, state.purchases);
